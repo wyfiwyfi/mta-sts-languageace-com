@@ -1,0 +1,110 @@
+https://emailsecurity.blog/hosting-your-mta-sts-policy-using-github-pages
+
+----
+Hosting your MTA-STS policy using GitHub Pages
+
+20th Feb 2020
+Guide
+
+Part of deploying MTA-STS is having access to a web server that is secured by SSL. If you don't currently have access to one, it becomes a roadblock in the deployment process. This article will show you how to use GitHub Pages to host the MTA-STS policy if you don't have a web server available.
+
+This article will use the deployment steps described in my earlier article about deploying MTA-STS. If want to learn more about what MTA-STS is, read that article first.
+Setting up GitHub
+
+To start, make sure you have a GitHub account. If not, creating one is free. Once you have an account and are logged in, go ahead and create a repository (repo) called mta-sts
+
+Once the repo is created, you'll be taken to the file manager, where all the files of repo live. It is currently empty, as we just created it.
+Disabling Jekyll
+
+GitHub Pages is powered by Jekyll, a static site generator. However, Jekyll does not serve folders that start with a dot unless explicitly told, which is necessary for MTA-STS. Therefore, we have to tell GitHub Pages to not serve our site using Jekyll but rather just serve the raw files.
+
+In order to do so, we'll add a single empty file called .nojekyll to the repo.
+
+Under Quick Setup click the Get started by creating a new file link.
+
+Once in the composer, type the following as the file name .nojekyll
+
+Leave the file body empty, scroll down and click the green Commit new file button.
+
+The file will be added and you will be then taken back to the file manager.
+Creating the Policy
+
+Back in the file manager, click the Create new file button to create the policy file.
+
+Once in the composer, type the following as the file name .well-known/mta-sts.txt
+
+Then, we will add the policy. Next to mx enter your domain's MX records, each on a separate line. These are the same that are in your DNS.
+
+      version: STSv1
+      mode: testing
+      mx: your-mx-record-here.com
+      mx: your-mx-record-here.com
+      max_age: 604800
+
+A note about the mode: Currently, the number of servers that support MTA-STS enforcement is low, and most email providers already use encrypted and authenticated connections. However, I recommend keeping the policy in testing mode for couple of weeks. That way you can get familiar with MTA-STS and fix any unlikely issues that may be brought up by the TLS-RPT reports. Once you're confident and ready, you can change the mode to enforce.
+
+Once you've finished creating the policy in the composer, scroll down and click the green Commit new file button.
+
+You will be then taken back to the file manager and you will see your new policy file is under the
+.well-known folder.
+Activating GitHub Pages
+
+With the policy created, it's now time to activate the GitHub Pages feature so that it can be served over your custom domain.
+
+First, go to your DNS provider and add a CNAME record with the following details:
+
+Host: mta-sts
+Points to: your-github-username.github.io
+
+In my case, the CNAME points to emailsecuritygeek.github.io
+
+Once the record is added, go back to your GitHub repo, click Settings on the repo navigation bar and scroll down to the Pages section.
+
+In this section, change the source to be the main branch and root folder. Click Save.
+
+Under Custom domain, enter mta-sts.yourdomain.com and click Save.
+
+Once the custom domain is setup, GitHub will start the process of issuing an SSL certificate using Let's Encrypt. This process takes about 15 minutes, but can take up to 24 hours. Once the certificate is issued, the Enforce HTTPS checkbox will be clickable. Please enable this setting once allowed to do so.
+
+Once this setting is enabled, we have our policy deployed. You can navigate to
+https://mta-sts.yourdomain.com/.well-known/mta-sts.txt - you should see the policy displayed and it should have loaded over HTTPS.
+Enabling the policy via DNS and configuring TLS-RPT
+
+Now that the policy is live on GitHub Pages, we need to signal the availability of MTA-STS via two TXT DNS records.
+
+The first TXT record should be added as follows:
+You can use any random number for id. I usually use the epoch time stamp for the id value, it's unique enough and lets you know when was the last time it was changed.
+
+Host: _mta-sts 
+Value: v=STSv1; id=1575556993
+
+Update the id to a new value every time you change your MTA-STS policy. External servers use the id value to determine when your policy changes.
+
+In order to recieve TLS-RPT reports either create a mailbox where you will recieve them, or sign up for a service like MailHardener or Report-URI which collects the reports for you and displays them in an easy to understand way.
+
+For the TLS-RPT record, add another TXT record with the following info:
+
+If you signed up for an aggregator, enter the email they gave you here. Else enter the mailbox you created. This is similar to how DMARC reports work.
+
+Host: _smtp._tls
+Value: v=TLSRPTv1; rua=mailto:tlsrpt@example.com
+
+Now, you may not get many reports, as not many MTAs are sending them (Google is the biggest that does, at the moment). However, as the standard gains traction, more MTAs will adopt TLS-RPT.
+
+If you want to verify that both MTA-STS and TLS-RPT were setup correctly, run your domain through Hardenize. Their free domain report will analyze your policies and provide recommendations if they're not setup correctly. If you prefer a simpler tool that only validates MTA-STS and TLS-RPT you can use this one.
+Editing the policy
+
+If you ever need to edit your policy (i.e. if you changed your MX records to a new provider), you can do so by editing the current policy file.
+
+Go to the repo file explorer and open the .well-known folder. Then click the policy file.
+
+Once in the policy file, click the pencil icon to edit it.
+
+Edit the file, and modify the needed parameters. When done, click the Commit changes button to save your changes.
+
+Don't forget to update the id value of the mta-sts TXT record!
+
+And that's it! You've enabled both MTA-STS and TLS-RPT, and you're on your way to supporting secure, un-tampered SMTP tramissions.
+
+If you have any questions, feel free to reach out. I'm more than happy to help.
+
